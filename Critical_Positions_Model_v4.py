@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
@@ -73,12 +74,45 @@ CONFIG = {
     },
 
     # Thresholds for categorization (e.g., top 20% are Critical)
-    'categorization_quantiles': {
-        'Critical': 0.80,
-        'Important': 0.50
-    }
+'categorization_quantiles': {
+    'Critical': 0.80,
+    'Important': 0.50
+}
 }
 # --- End of Configuration Block ---
+
+WEIGHTS_FILE = 'optimized_weights.json'
+
+
+def apply_optimized_weights() -> None:
+    """Override configuration with weights from ``WEIGHTS_FILE`` if present."""
+    if not os.path.exists(WEIGHTS_FILE):
+        return
+    with open(WEIGHTS_FILE, 'r') as f:
+        data = json.load(f)
+
+    num_weights = data.get('numeric_weights')
+    if num_weights:
+        CONFIG['numeric_features']['weights'] = num_weights
+
+    fin_weights = data.get('final_score_weights')
+    if fin_weights:
+        CONFIG['final_score_weights']['numeric_composite'] = fin_weights.get(
+            'numeric_composite',
+            CONFIG['final_score_weights']['numeric_composite'],
+        )
+        for key in CONFIG['final_score_weights']['text_features'].keys():
+            if key in fin_weights:
+                CONFIG['final_score_weights']['text_features'][key] = fin_weights[key]
+
+    crit_q = data.get('critical_quantile')
+    imp_q = data.get('important_quantile')
+    if crit_q is not None and imp_q is not None:
+        CONFIG['categorization_quantiles']['Critical'] = crit_q
+        CONFIG['categorization_quantiles']['Important'] = imp_q
+
+
+apply_optimized_weights()
 
 client = OpenAI()
 
